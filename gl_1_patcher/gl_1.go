@@ -107,17 +107,9 @@ func main() {
 		fmt.Println(err)
 	}
 	fmt.Println(dir)
-	bugno, _ := strconv.Atoi(os.Args[1])
-	bugListFilePath := os.Args[2]
-	bugList := readBugList(bugListFilePath)
-
-	_, ok := bugList[bugno]
-	if ! ok {
-		return
-	}
-	//bugno = 24
-	dat, _ := ioutil.ReadFile(bugList[bugno].src)
-    fmt.Println(bugList[bugno].src)
+	filename:= os.Args[1]//filename
+	lineno, _ := strconv.Atoi(os.Args[2])//lineno
+	dat, _ := ioutil.ReadFile(filename)
 	// src is the input for which we want to print the AST.
 	src := string(dat)
 	// Create the AST by parsing src.
@@ -126,9 +118,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	patchedCode := fixGoroutineLeakOnChannelType1(bugList[bugno].lineno, fset, f)
+	patchedCode := fixGoroutineLeakOnChannelType1(lineno, fset, f)
 	fmt.Println(patchedCode)
-	patch(bugList[bugno].src, patchedCode)
+	patch(filename, patchedCode)
 	// Print the AST.
 	//ast.Print(fset, f)
 }
