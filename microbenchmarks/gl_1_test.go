@@ -1,46 +1,26 @@
 package microbenchmarks
 
 import (
-	"fmt"
 	"testing"
-	"time"
 )
 
 
 func gl1_before() {
 	done := make(chan struct{})
-	go func() int {
-		sum := 0
-		for i:= 0; i<10; i++ {
-			sum += i*i^(i-1)*(i-1)
-		}
+	go func() {
 		done <- struct{}{}
-		return sum
 	}()
-	select {
-	case <-time.After(100*time.Second):
-		fmt.Println("timeout")
-	case <-done:
-		return
-	}
+	<-done
+	return
 }
 
 func gl1_after() {
 	done := make(chan struct{}, 1)
-	go func() int {
-		sum := 0
-		for i:= 0; i<10; i++ {
-			sum += i*i^(i-1)*(i-1)
-		}
+	go func() {
 		done <- struct{}{}
-		return sum
 	}()
-	select {
-	case <-time.After(100*time.Second):
-		fmt.Println("timeout")
-	case <-done:
-		return
-	}
+	<-done
+	return
 }
 
 func BenchmarkGL1Before(b *testing.B) {
