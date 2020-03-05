@@ -1,3 +1,0 @@
-bugno,bugtype,src,lineno
-24,GL-1,go.etcd.io/etcd/integration/v3_watch_test.go,1191
-25,GL-1,go.etcd.io/etcd/integration/v3election_grpc_test.go,100
