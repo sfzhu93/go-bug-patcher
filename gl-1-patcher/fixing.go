@@ -22,7 +22,7 @@ type BugItem struct {
 }
 
 //https://github.com/zupzup/ast-manipulation-example/blob/master/main.go
-func fixGoroutineLeakOnChannelType1(lineno int, fset *token.FileSet, f *ast.File) string {
+func fixGoroutineLeakOnChannelType1(lineno int, fset *token.FileSet, f *ast.File) {
 	var argSite *ast.CallExpr = nil
 	ast.Inspect(f, func(node ast.Node) bool {
 		switch x := node.(type) {
@@ -46,12 +46,7 @@ func fixGoroutineLeakOnChannelType1(lineno int, fset *token.FileSet, f *ast.File
 	if argSite != nil {
 		argSite.Args = append(argSite.Args, &ast.BasicLit{Kind: token.INT, Value: "1"})
 	}
-	var retbuf strings.Builder
-	err := printer.Fprint(&retbuf, fset, f)
-	if err != nil {
-		//TODO
-	}
-	return retbuf.String()
+
 	//ast.Print(fset, f)
 }
 
@@ -108,7 +103,7 @@ func main() {
 	}
 	fmt.Println(dir)
 	filename:= os.Args[1]//filename
-	lineno, _ := strconv.Atoi(os.Args[2])//lineno
+	//lineno, _ := strconv.Atoi(os.Args[2])//lineno
 	dat, _ := ioutil.ReadFile(filename)
 	// src is the input for which we want to print the AST.
 	src := string(dat)
@@ -118,7 +113,19 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	patchedCode := fixGoroutineLeakOnChannelType1(lineno, fset, f)
+
+	for _, strLine := range os.Args[2:] {
+		lineno, _ := strconv.Atoi(strLine)
+		fixGoroutineLeakOnChannelType1(lineno, fset, f)
+	}
+
+	var retbuf strings.Builder
+	err = printer.Fprint(&retbuf, fset, f)
+	if err != nil {
+		//TODO
+	}
+	patchedCode := retbuf.String()
+
 	//fmt.Println(patchedCode)
 	patch(filename, patchedCode)
 	// Print the AST.
