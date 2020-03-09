@@ -5,7 +5,7 @@ import (
 )
 
 
-func gl1_before() {
+func unbufferSync() {
 	done := make(chan struct{})
 	go func() {
 		done <- struct{}{}
@@ -14,7 +14,7 @@ func gl1_before() {
 	return
 }
 
-func gl1_after() {
+func bufferSync() {
 	done := make(chan struct{}, 1)
 	go func() {
 		done <- struct{}{}
@@ -23,14 +23,14 @@ func gl1_after() {
 	return
 }
 
-func BenchmarkGL1Before(b *testing.B) {
+func BenchmarkUnbufferSync(b *testing.B) {
 	for i:=0; i< b.N; i++ {
-		gl1_before()
+		unbufferSync()
 	}
 }
 
-func BenchmarkGL1After(b *testing.B) {
+func BenchmarkBufferSync(b *testing.B) {
 	for i:=0; i< b.N; i++ {
-		gl1_after()
+		bufferSync()
 	}
 }
