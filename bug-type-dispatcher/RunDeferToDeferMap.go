@@ -1,5 +1,6 @@
 package main
 
+/*
 import (
 	"golang.org/x/tools/go/ssa"
 )
@@ -74,4 +75,4 @@ func gen_defer_map_in_fn(fn *ssa.Function) {
 			}
 		}
 	}
-}
+}*/
