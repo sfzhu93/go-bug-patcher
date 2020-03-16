@@ -279,14 +279,16 @@ func isLastSendBeforeReturn(sendInst *ssa.Send) bool {
 }
 
 func main() {
-	pathToFile := os.Args[1]                //filename
-	lineno, err := strconv.Atoi(os.Args[2]) //line no. of channel send instruction
+	pathToFile := os.Args[1] //filename
+	packagePath := os.Args[2]
+	lineno, err := strconv.Atoi(os.Args[3]) //line no. of channel send instruction
 	dirpath, filename := path.Split(pathToFile)
+	_ = dirpath
 	if err != nil {
 		log.Fatal("the line number is invalid\n")
 	}
-	cfg := packages.Config{Mode: packages.LoadAllSyntax}
-	initial, err := packages.Load(&cfg, dirpath)
+	cfg := packages.Config{Mode: packages.LoadAllSyntax, Tests: true}
+	initial, err := packages.Load(&cfg, packagePath)
 	//initial, err := packages.Load(&cfg, "examples")
 	if err != nil {
 		log.Fatal(err)
