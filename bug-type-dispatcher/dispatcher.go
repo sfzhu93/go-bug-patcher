@@ -8,6 +8,7 @@ import (
 	"golang.org/x/tools/go/ssa/ssautil"
 	"log"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 )
@@ -192,21 +193,24 @@ func findMakeByLineNo(program *ssa.Program, fset *token.FileSet, filename string
 	return nil
 }
 
-func findSendByLineNo(program *ssa.Program, fset *token.FileSet, filename string, lineno int) *ssa.MakeChan {
+func findSendByLineNo(program *ssa.Program, fset *token.FileSet, filename string, lineno int) *ssa.Send {
 	for fn := range ssautil.AllFunctions(program) {
 		for _, bb := range fn.Blocks {
+			entered := false
 			for _, ins := range bb.Instrs {
 				position := fset.Position(ins.Pos())
 				fileNameInPath := getFileNameFromPath(position.Filename)
 				if position.Line == lineno && fileNameInPath == filename {
-					makeinst, ok := ins.(*ssa.MakeChan)
+					entered = true
+					makeinst, ok := ins.(*ssa.Send)
 					if ok {
 						return makeinst
-					} else {
-						fmt.Print(ins)
-						panic("didn't find make in line" + string(lineno))
 					}
 				}
+			}
+			if entered {
+				fmt.Println(bb)
+				panic("didn't find send in line" + string(lineno))
 			}
 		}
 	}
@@ -258,13 +262,14 @@ func isLastSendBeforeReturn(sendInst *ssa.Send) bool {
 }
 
 func main() {
-	path := os.Args[1]                      //filename
+	pathToFile := os.Args[1]                //filename
 	lineno, err := strconv.Atoi(os.Args[2]) //line no. of channel send instruction
+	dirpath, filename := path.Split(pathToFile)
 	if err != nil {
 		log.Fatal("the line number is invalid\n")
 	}
 	cfg := packages.Config{Mode: packages.LoadAllSyntax}
-	initial, err := packages.Load(&cfg, path)
+	initial, err := packages.Load(&cfg, dirpath)
 	//initial, err := packages.Load(&cfg, "examples")
 	if err != nil {
 		log.Fatal(err)
@@ -276,8 +281,8 @@ func main() {
 
 	// Build SSA code for the whole program.
 	prog.Build()
-	printSSA(prog)
-	sendInst := findSendByLineNo(prog, prog.Fset, path, lineno)
+	//printSSA(prog)
+	sendInst := findSendByLineNo(prog, prog.Fset, filename, lineno)
 	if isGL1(sendInst) {
 		println("1")
 	}
