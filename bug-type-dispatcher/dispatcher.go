@@ -171,6 +171,23 @@ func printSSA(program *ssa.Program) {
 	}
 }
 
+func printSSAByFileAndLineNo(program *ssa.Program, filename string, lineno int) {
+	for fn := range ssautil.AllFunctions(program) {
+		fmt.Println(fn.String())
+		for _, bb := range fn.Blocks {
+			fmt.Println("  ", bb.String()+":")
+			for _, ins := range bb.Instrs {
+				fmt.Print("    ")
+				value, ok := ins.(ssa.Value)
+				if ok {
+					fmt.Print(value.Name(), "=")
+				}
+				fmt.Println(ins.String())
+			}
+		}
+	}
+}
+
 //TODO: change to find `new chan`
 func findMakeByLineNo(program *ssa.Program, fset *token.FileSet, filename string, lineno int) *ssa.MakeChan {
 	for fn := range ssautil.AllFunctions(program) {
@@ -283,6 +300,10 @@ func main() {
 	prog.Build()
 	//printSSA(prog)
 	sendInst := findSendByLineNo(prog, prog.Fset, filename, lineno)
+	if sendInst == nil {
+		printSSAByFileAndLineNo(prog, pathToFile, lineno)
+		log.Fatal("couldn't find send in the line number")
+	}
 	if isGL1(sendInst) {
 		println("1")
 	}
