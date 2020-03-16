@@ -6,8 +6,112 @@ import (
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/ssa"
 	"golang.org/x/tools/go/ssa/ssautil"
+	"log"
+	"os"
+	"strconv"
 	"strings"
 )
+
+var debug bool = false
+
+func hasDirectCallSites(calleeFunc *ssa.Function, program *ssa.Program) bool {
+	for fn := range ssautil.AllFunctions(program) {
+		for _, bb := range fn.Blocks {
+			for _, ins := range bb.Instrs {
+				callinst, ok := ins.(*ssa.Call)
+				if ok {
+					callInstCallee := callinst.Call.StaticCallee()
+					/*
+						if callInstCallee != nil {
+							fmt.Println(callInstCallee.Name())
+						} else {
+							fmt.Println(callinst.Call)
+						}
+						fmt.Println(calleeFunc.Name())*/
+					if callInstCallee == calleeFunc {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+func findGoInstSites(calleeFunc *ssa.Function, program *ssa.Program) []*ssa.Go {
+	//fmt.Println(calleeFunc)
+	ret := make([]*ssa.Go, 0)
+	for fn := range ssautil.AllFunctions(program) {
+		for _, bb := range fn.Blocks {
+			for _, ins := range bb.Instrs {
+				goinst, ok := ins.(*ssa.Go)
+				if ok {
+					//fmt.Println(goinst)
+					callInstCallee := goinst.Call.StaticCallee()
+					/*
+						if callInstCallee != nil {
+							fmt.Println(callInstCallee.Name())
+						} else {
+							fmt.Println(callinst.Call)
+						}
+						fmt.Println(calleeFunc.Name())*/
+					if callInstCallee == calleeFunc {
+						ret = append(ret, goinst)
+					}
+				}
+			}
+		}
+	}
+	return ret
+}
+
+func isGL1(send ssa.Instruction) bool {
+	ssaFunc := send.Parent() //the goroutine function
+	prog := ssaFunc.Prog
+	if hasDirectCallSites(ssaFunc, prog) {
+		if debug {
+			fmt.Println("has other direct call sites!")
+		}
+		return false
+	}
+	sendInst, ok := send.(*ssa.Send)
+	if !ok {
+		if debug {
+			fmt.Println("Not a send inst!") //TODO: not a correct way to handle error
+		}
+		return false
+	}
+	if !isLastSendBeforeReturn(sendInst) {
+		if debug {
+			fmt.Println("is not the last send before return!")
+		}
+		return false
+	}
+	goinsts := findGoInstSites(ssaFunc, prog)
+	if len(goinsts) == 0 {
+		if debug {
+			fmt.Println("The goroutine is not created by an anonymous function. (TODO)")
+		}
+		return false
+	} else if len(goinsts) > 1 {
+		if debug {
+			fmt.Println("more than one goroutine created")
+		}
+		return false
+	}
+	goinst := goinsts[0]
+	parentFunc := goinst.Parent()
+	loopinfo := NewLoopInfo(parentFunc)
+	loopinfo.Analyze()
+	_, ok = loopinfo.isLoopBB[goinst.Block()]
+	if ok {
+		if debug {
+			fmt.Println("is in a loop!")
+		}
+		return false
+	}
+	return true
+}
 
 func getFileNameFromPath(path string) string {
 	splits := strings.Split(path, "/")
@@ -16,7 +120,7 @@ func getFileNameFromPath(path string) string {
 }
 
 //TODO: should use absolute path
-func findFunctionByLineNo(program *ssa.Program, fset *token.FileSet, filename string, lineno int) (*ssa.Function) {
+func findFunctionByLineNo(program *ssa.Program, fset *token.FileSet, filename string, lineno int) *ssa.Function {
 	for fn := range ssautil.AllFunctions(program) {
 		for _, bb := range fn.Blocks {
 			for _, ins := range bb.Instrs {
@@ -65,19 +169,21 @@ func printSSA(program *ssa.Program) {
 		}
 	}
 }
+
 //TODO: change to find `new chan`
-func findMakeByLineNo(program *ssa.Program, fset *token.FileSet, filename string, lineno int) *ssa.MakeChan{
+func findMakeByLineNo(program *ssa.Program, fset *token.FileSet, filename string, lineno int) *ssa.MakeChan {
 	for fn := range ssautil.AllFunctions(program) {
 		for _, bb := range fn.Blocks {
 			for _, ins := range bb.Instrs {
 				position := fset.Position(ins.Pos())
 				fileNameInPath := getFileNameFromPath(position.Filename)
 				if position.Line == lineno && fileNameInPath == filename {
-					makeinst, ok := ins.(*ssa.MakeChan); if ok {
+					makeinst, ok := ins.(*ssa.MakeChan)
+					if ok {
 						return makeinst
 					} else {
 						fmt.Print(ins)
-						panic("didn't find make in line"+string(lineno))
+						panic("didn't find make in line" + string(lineno))
 					}
 				}
 			}
@@ -86,18 +192,19 @@ func findMakeByLineNo(program *ssa.Program, fset *token.FileSet, filename string
 	return nil
 }
 
-func findSendByLineNo(program *ssa.Program, fset *token.FileSet, filename string, lineno int) *ssa.MakeChan{
+func findSendByLineNo(program *ssa.Program, fset *token.FileSet, filename string, lineno int) *ssa.MakeChan {
 	for fn := range ssautil.AllFunctions(program) {
 		for _, bb := range fn.Blocks {
 			for _, ins := range bb.Instrs {
 				position := fset.Position(ins.Pos())
 				fileNameInPath := getFileNameFromPath(position.Filename)
 				if position.Line == lineno && fileNameInPath == filename {
-					makeinst, ok := ins.(*ssa.MakeChan); if ok {
+					makeinst, ok := ins.(*ssa.MakeChan)
+					if ok {
 						return makeinst
 					} else {
 						fmt.Print(ins)
-						panic("didn't find make in line"+string(lineno))
+						panic("didn't find make in line" + string(lineno))
 					}
 				}
 			}
@@ -151,24 +258,28 @@ func isLastSendBeforeReturn(sendInst *ssa.Send) bool {
 }
 
 func main() {
-/*	path := os.Args[1]//filename
-	lineno, _ := strconv.Atoi(os.Args[2])//lineno
-*/
+	path := os.Args[1]                    //filename
+	lineno, _ := strconv.Atoi(os.Args[2]) //line no. of channel send instruction
+
 	cfg := packages.Config{Mode: packages.LoadAllSyntax}
-	//initial, err := packages.Load(&cfg, path)
-	initial, err := packages.Load(&cfg, "examples")
+	initial, err := packages.Load(&cfg, path)
+	//initial, err := packages.Load(&cfg, "examples")
 	if err != nil {
-		//log.Fatal(err)
+		log.Fatal(err)
 	}
 
 	// Create SSA packages for well-typed packages and their dependencies.
-	prog, pkgs := ssautil.AllPackages(initial, ssa.NaiveForm)//ssa.PrintPackages
+	prog, pkgs := ssautil.AllPackages(initial, ssa.NaiveForm) //ssa.PrintPackages
 	_ = pkgs
 
 	// Build SSA code for the whole program.
 	prog.Build()
 	printSSA(prog)
-	fn := findFunctionByLineNo(prog, prog.Fset, "ex1.go", 4)
+	sendInst := findSendByLineNo(prog, prog.Fset, path, lineno)
+	if isGL1(sendInst) {
+		println("1")
+	}
+	/*fn := findFunctionByLineNo(prog, prog.Fset, "ex1.go", 4)
 	if fn != nil {
 		makeInst := findMakeByLineNo(prog, prog.Fset, "ex1.go", 4)
 		allSend := findSendByMake(makeInst)
@@ -178,6 +289,6 @@ func main() {
 				return
 			}
 		}
-	}
+	}*/
 	println("unknown")
 }
