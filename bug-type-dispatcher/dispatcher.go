@@ -159,15 +159,25 @@ func printSSA(program *ssa.Program) {
 		fmt.Println(fn.String())
 		for _, bb := range fn.Blocks {
 			fmt.Println("  ", bb.String()+":")
-			for _, ins := range bb.Instrs {
-				fmt.Print("    ")
-				value, ok := ins.(ssa.Value)
-				if ok {
-					fmt.Print(value.Name(), "=")
-				}
-				fmt.Println(ins.String())
-			}
+			printSSAInBB(bb)
 		}
+	}
+}
+
+func printSSAInBB(bb *ssa.BasicBlock) {
+	for _, ins := range bb.Instrs {
+		fmt.Print("    ")
+		value, ok := ins.(ssa.Value)
+		if ok {
+			fmt.Print(value.Name(), "=")
+		}
+		fmt.Println(ins.String())
+	}
+}
+
+func printIncludedFiles(program *ssa.Program) {
+	for fn := range ssautil.AllFunctions(program) {
+		fmt.Println(program.Fset.Position(fn.Pos()).Filename)
 	}
 }
 
@@ -226,7 +236,7 @@ func findSendByLineNo(program *ssa.Program, fset *token.FileSet, filename string
 				}
 			}
 			if entered {
-				fmt.Println(bb)
+				printSSAInBB(bb)
 				panic("didn't find send in line" + string(lineno))
 			}
 		}
@@ -303,11 +313,13 @@ func main() {
 	//printSSA(prog)
 	sendInst := findSendByLineNo(prog, prog.Fset, filename, lineno)
 	if sendInst == nil {
-		printSSAByFileAndLineNo(prog, pathToFile, lineno)
+		printIncludedFiles(prog)
+		//printSSAByFileAndLineNo(prog, pathToFile, lineno)
 		log.Fatal("couldn't find send in the line number")
 	}
 	if isGL1(sendInst) {
 		println("1")
+		return
 	}
 	/*fn := findFunctionByLineNo(prog, prog.Fset, "ex1.go", 4)
 	if fn != nil {
