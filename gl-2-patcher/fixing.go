@@ -96,8 +96,15 @@ func insertBeforeLineNo(lineno int, stmt ast.Stmt, fset *token.FileSet, f *ast.F
 				}
 			}
 			if visited {
-				formerPart := append(body.List[:index], stmt)
-				body.List = append(formerPart, body.List[index:]...)
+				newList := make([]ast.Stmt, len(body.List)+1)
+				for i := 0; i < index; i++ {
+					newList[i] = body.List[i]
+				}
+				newList[index] = stmt
+				for i := index; i < len(body.List); i++ {
+					newList[i+1] = body.List[i]
+				}
+				body.List = newList
 			}
 			return false
 		}
