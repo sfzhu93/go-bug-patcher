@@ -97,7 +97,7 @@ func insertBeforeLineNo(lineno int, stmt ast.Stmt, fset *token.FileSet, f *ast.F
 			}
 			if visited {
 				formerPart := append(body.List[:index], stmt)
-				body.List = append(formerPart, body.List[index+1:]...)
+				body.List = append(formerPart, body.List[index:]...)
 			}
 			return false
 		}
