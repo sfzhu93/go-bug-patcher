@@ -305,7 +305,8 @@ PROPATH=${{GOPATH}}/src/{0}
 BUGGY_VERSION={1}
 BUGFILE=${{PROPATH}}/{2}
 BUGLINE={3}
-
+HELPERFILE=hack/make/.integration-test-helpers
+TESTNAME=TestGetContainersAttachWebsocket
 """.format(go_get_url, buggy_commit, buggyfiles, buggyline))
 
         fd.write("""export GOPATH=$GOPATH
