@@ -306,7 +306,6 @@ BUGGY_VERSION={1}
 BUGFILE=${{PROPATH}}/{2}
 BUGLINE={3}
 HELPERFILE=hack/make/.integration-test-helpers
-TESTNAME=TestGetContainersAttachWebsocket
 """.format(go_get_url, buggy_commit, buggyfiles, buggyline))
 
         fd.write("""export GOPATH=$GOPATH
@@ -328,6 +327,7 @@ git reset --hard ${{BUGGY_VERSION}}
 sed '16 s/\\:\\=1\\}}/\\:\\=10\\}}/' $HELPERFILE > ${{TMPPATH}}/helper.tmp #set the number of repeating test
 
 mv ${{TMPPATH}}/helper.tmp $HELPERFILE
+TESTNAME={0}
 
 echo 'run the original' {1}/{0} '...'
 make TEST_FILTER=${{TESTNAME}} test-integration >> ${{TMPPATH}}/buggy.time
