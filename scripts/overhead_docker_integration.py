@@ -2,6 +2,7 @@ import sys
 
 
 def parseInput(file, testcasename):
+    testcasename = '/' + testcasename + ' '
     durations = []
     with open(file) as f:
         for line in f:
