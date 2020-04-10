@@ -12,8 +12,9 @@ go_get_url = "github.com/docker/docker"
 
 group2bugno = {
     "1": [11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32],
-                  #13,, 33, 34, 35, 36,
-          #37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54
+    "2": [33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54],
+    # 13,, 33, 34, 35, 36,
+    # 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54
 }
 
 group2commit = {
@@ -22,7 +23,7 @@ group2commit = {
 
 bugno2testcases = {11: ['TestGetContainersAttachWebsocket'],
                    12: ['TestGetContainersAttachWebsocket'],
-                   #13: [''],
+                   # 13: [''],
                    14: ['TestGetStoppedContainerStats'],
                    15: ['TestLogsAPIWithStdout'],
                    16: ['TestLogsAPIUntilFutureFollow'],
@@ -42,6 +43,28 @@ bugno2testcases = {11: ['TestGetContainersAttachWebsocket'],
                    30: ['TestExecInteractiveStdinClose'],
                    31: ['TestExecTTY'],
                    32: ['TestExternalVolumeDriverLookupNotBlocked'],
+                   33: ['TestExternalVolumeDriverRetryNotImmediatelyExists'],
+                   34: ['TestLogsFollowStopped'],
+                   35: ['TestConcurrentPullWholeRepo'],
+                   36: ['TestConcurrentFailingPull'],
+                   37: ['TestConcurrentPullMultipleTags'],
+                   38: ['TestConcurrentPush'],
+                   39: ['TestRunExitOnStdinClose'],
+                   40: ['TestRunTTYWithPipe'],
+                   41: ['TestRunPIDHostWithChildIsKillable'],
+                   42: ['TestRunStdinBlockedAfterContainerExit'],
+                   43: ['TestRunRedirectStdout'],
+                   44: ['TestRunAttachDetach'],
+                   45: ['TestRunAttachDetachFromFlag'],
+                   46: ['TestRunAttachDetachFromConfig'],
+                   47: ['TestRunAttachDetachKeysOverrideConfig'],
+                   48: ['TestRunOOMExitCode'],
+                   49: ['TestServiceLogsFollow'],
+                   50: ['TestStartAttachReturnsOnError'],
+                   51: ['TestStatsNoStream'],
+                   52: ['TestExecWithCloseStdin'],
+                   53: ['TestContinueAfterPluginCrash'],
+                   54: ['TestShmSizeReload', 'TestDaemonDiscoveryBackendConfigReload'],
                    }
 
 bugno2testpath = {11: 'integration-cli',
@@ -66,6 +89,28 @@ bugno2testpath = {11: 'integration-cli',
                   30: 'integration-cli',
                   31: 'integration-cli',
                   32: 'integration-cli',
+                  33: 'integration-cli',
+                  34: 'integration-cli',
+                  35: 'integration-cli',
+                  36: 'integration-cli',
+                  37: 'integration-cli',
+                  38: 'integration-cli',
+                  39: 'integration-cli',
+                  40: 'integration-cli',
+                  41: 'integration-cli',
+                  42: 'integration-cli',
+                  43: 'integration-cli',
+                  44: 'integration-cli',
+                  45: 'integration-cli',
+                  46: 'integration-cli',
+                  47: 'integration-cli',
+                  48: 'integration-cli',
+                  49: 'integration-cli',
+                  50: 'integration-cli',
+                  51: 'integration-cli',
+                  52: 'integration/container',
+                  53: 'integration/plugin/logging',
+                  54: 'testutil/daemon',
                   }
 
 bugno2buggyfiles = {
@@ -91,6 +136,28 @@ bugno2buggyfiles = {
     30: 'integration-cli/docker_cli_exec_unix_test.go',
     31: 'integration-cli/docker_cli_exec_unix_test.go',
     32: 'integration-cli/docker_cli_external_volume_driver_test.go',
+    33: 'integration-cli/docker_cli_external_volume_driver_test.go',
+    34: 'integration-cli/docker_cli_logs_test.go',
+    35: 'integration-cli/docker_cli_pull_local_test.go',
+    36: 'integration-cli/docker_cli_pull_local_test.go',
+    37: 'integration-cli/docker_cli_pull_local_test.go',
+    38: 'integration-cli/docker_cli_push_test.go',
+    39: 'integration-cli/docker_cli_run_test.go',
+    40: 'integration-cli/docker_cli_run_test.go',
+    41: 'integration-cli/docker_cli_run_test.go',
+    42: 'integration-cli/docker_cli_run_test.go',
+    43: 'integration-cli/docker_cli_run_unix_test.go',
+    44: 'integration-cli/docker_cli_run_unix_test.go',
+    45: 'integration-cli/docker_cli_run_unix_test.go',
+    46: 'integration-cli/docker_cli_run_unix_test.go',
+    47: 'integration-cli/docker_cli_run_unix_test.go',
+    48: 'integration-cli/docker_cli_run_unix_test.go',
+    49: 'integration-cli/docker_cli_service_logs_test.go',
+    50: 'integration-cli/docker_cli_start_test.go',
+    51: 'integration-cli/docker_cli_stats_test.go',
+    52: 'integration/container/exec_test.go',
+    53: 'integration/plugin/logging/logging_linux_test.go',
+    54: 'testutil/daemon/daemon.go',
 }
 
 bugno2buggyfuncname = {
@@ -142,6 +209,7 @@ bugno2buggyline = {
     31: 59,
     32: 368,
 }
+
 
 # TODO: add information for patch
 
@@ -207,15 +275,15 @@ def deploy(bug_id, buggy_commit):
     create_if_not_exist(src_path)
     os.chdir(src_path)
     print("go get...")
-    #os.system("go get " + go_get_url)
-    #src_path = os.path.join(src_path, go_get_url)
-    #os.chdir(src_path)
-    #print("git reset...")
-    #os.system("git reset --hard " + buggy_commit)
+    # os.system("go get " + go_get_url)
+    # src_path = os.path.join(src_path, go_get_url)
+    # os.chdir(src_path)
+    # print("git reset...")
+    # os.system("git reset --hard " + buggy_commit)
     print(bug_id, bugno2buggyfiles[bug_id])
-    #os.chdir(os.path.join(src_path, bugno2testpath[bug_id]))
-    #executeBugNo(bug_id)
-    #patch(src_path, bug_id)
+    # os.chdir(os.path.join(src_path, bugno2testpath[bug_id]))
+    # executeBugNo(bug_id)
+    # patch(src_path, bug_id)
 
 
 def make_copy_inject(filename, buggy_commit, buggyfiles, testcases, testpaths):
@@ -347,6 +415,6 @@ python ${{OVERSCR}} ${{TMPPATH}}/buggy.time ${{TMPPATH}}/patch.time 10 $TESTNAME
 
 
 if __name__ == "__main__":
-    groupname = '1'
+    groupname = '2'
     for bugno in group2bugno[groupname]:
         deploy(bugno, group2commit[groupname])
