@@ -3,13 +3,8 @@ package main
 import (
 	"fmt"
 	"go/token"
-	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/ssa"
 	"golang.org/x/tools/go/ssa/ssautil"
-	"log"
-	"os"
-	"path"
-	"strconv"
 	"strings"
 )
 
@@ -286,51 +281,4 @@ func isLastSendBeforeReturn(sendInst *ssa.Send) bool {
 		}
 	}
 	return false
-}
-
-func main() {
-	pathToFile := os.Args[1] //filename
-	packagePath := os.Args[2]
-	lineno, err := strconv.Atoi(os.Args[3]) //line no. of channel send instruction
-	dirpath, filename := path.Split(pathToFile)
-	_ = dirpath
-	if err != nil {
-		log.Fatal("the line number is invalid\n")
-	}
-	cfg := packages.Config{Mode: packages.LoadAllSyntax, Tests: true}
-	initial, err := packages.Load(&cfg, packagePath)
-	//initial, err := packages.Load(&cfg, "examples")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Create SSA packages for well-typed packages and their dependencies.
-	prog, pkgs := ssautil.AllPackages(initial, ssa.NaiveForm) //ssa.PrintPackages
-	_ = pkgs
-
-	// Build SSA code for the whole program.
-	prog.Build()
-	//printSSA(prog)
-	sendInst := findSendByLineNo(prog, prog.Fset, filename, lineno)
-	if sendInst == nil {
-		printIncludedFiles(prog)
-		//printSSAByFileAndLineNo(prog, pathToFile, lineno)
-		log.Fatal("couldn't find send in the line number")
-	}
-	if isGL1(sendInst) {
-		println("1")
-		return
-	}
-	/*fn := findFunctionByLineNo(prog, prog.Fset, "ex1.go", 4)
-	if fn != nil {
-		makeInst := findMakeByLineNo(prog, prog.Fset, "ex1.go", 4)
-		allSend := findSendByMake(makeInst)
-		for _, send := range allSend {
-			if  !checkHasDirectCallSites(send.Parent(), prog) && isLastSendBeforeReturn(send) {
-				println(1)
-				return
-			}
-		}
-	}*/
-	println("unknown")
 }
