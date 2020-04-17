@@ -15,24 +15,29 @@ func tryPackagePath(packagePath string) bool {
 	gopath := os.Getenv("GOPATH")
 	cfg := packages.Config{Mode: packages.LoadAllSyntax, Tests: true}
 	for ; strings.HasPrefix(packagePath, path.Join(gopath, "src")); packagePath, _ = path.Split(packagePath) {
+        println(packagePath)
 		pkgs, err := packages.Load(&cfg, packagePath)
 		_ = pkgs
 		if err == nil {
 			return true
-		}
+		} else {
+            println(err)
+        }
 	}
 	return false
 }
 
 func main() {
 	packagePath := *flag.String("package", "", "The compilable pacakge containing the buggy file.")
-	pathToFile := *flag.String("path", "", "The path to the buggy file.")
+	pathToFile := flag.String("path", "", "The path to the buggy file.")
 	bugType := *flag.Int("type", 0, "1: `send` definitely executed. 2: `recv/close` "+
 		"definitely executed.")
-	lineNo := *flag.Int("type", 0, "The line no. of the definitely executed operation.")
+	lineNo := *flag.Int("lineno", 0, "The line no. of the definitely executed operation.")
+    flag.Parse()
 	_ = bugType
 	_ = lineNo
-	dirpath, filename := path.Split(pathToFile)
+    println(*pathToFile)
+	dirpath, filename := path.Split(*pathToFile)
 	if tryPackagePath(dirpath) {
 		println(dirpath + "1")
 	} else {
@@ -54,7 +59,7 @@ func main() {
 	// Build SSA code for the whole program.
 	prog.Build()
 	//printSSA(prog)
-	sendInst := findSendByLineNo(prog, prog.Fset, filename, lineno)
+	sendInst := findSendByLineNo(prog, prog.Fset, filename, lineNo)
 	if sendInst == nil {
 		printIncludedFiles(prog)
 		//printSSAByFileAndLineNo(prog, pathToFile, lineno)
