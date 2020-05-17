@@ -2,12 +2,15 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"git.gradebot.org/zxl381/goconcurrencychecker/global"
 	"git.gradebot.org/zxl381/goconcurrencychecker/mycallgraph"
 	"git.gradebot.org/zxl381/goconcurrencychecker/tools/go/callgraph"
 	"git.gradebot.org/zxl381/goconcurrencychecker/tools/go/mypointer"
 	"git.gradebot.org/zxl381/goconcurrencychecker/tools/go/ssa"
 	"git.gradebot.org/zxl381/goconcurrencychecker/tools/go/ssa/ssautil"
+	"reflect"
+
 	//"golang.org/x/tools/go/callgraph"
 	"git.gradebot.org/zxl381/goconcurrencychecker/tools/go/packages"
 	//"golang.org/x/tools/go/pointer"
@@ -19,6 +22,79 @@ import (
 )
 
 const MaxDepth = 8
+
+type BackEdge struct {
+	src *ssa.BasicBlock
+	dst *ssa.BasicBlock
+}
+
+type LoopInfo struct {
+	status    map[*ssa.BasicBlock]int //0: in progress 1: done
+	isLoopBB  map[*ssa.BasicBlock]struct{}
+	backEdges []BackEdge
+	fn        *ssa.Function
+}
+
+func NewLoopInfo(function *ssa.Function) *LoopInfo {
+	ret := LoopInfo{
+		status:    make(map[*ssa.BasicBlock]int),
+		isLoopBB:  make(map[*ssa.BasicBlock]struct{}),
+		backEdges: make([]BackEdge, 0),
+		fn:        function,
+	}
+	return &ret
+}
+
+func contains(this *map[*ssa.BasicBlock]int, bb *ssa.BasicBlock) bool {
+	_, ok := (*this)[bb]
+	if ok {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (this *LoopInfo) dfs(bb *ssa.BasicBlock) {
+	this.status[bb] = 0
+	for _, succ := range bb.Succs {
+		if !contains(&this.status, succ) {
+			this.dfs(succ)
+		} else if this.status[succ] == 0 {
+			this.backEdges = append(this.backEdges, BackEdge{
+				src: succ,
+				dst: bb,
+			})
+		}
+	}
+	this.status[bb] = 1
+}
+
+func (this *LoopInfo) revDfs(bb *ssa.BasicBlock) {
+	this.status[bb] = 1
+	for _, pred := range bb.Preds {
+		if !contains(&this.status, pred) {
+			this.revDfs(pred)
+		}
+	}
+	this.status[bb] = 1
+}
+
+func (this *LoopInfo) Analyze() {
+	//for each back edges:
+	//clear status map
+	//reverse dfs to find loop body bbs.
+	this.dfs(this.fn.Blocks[0]) //dfs to find back edges.
+	for _, backedge := range this.backEdges {
+		this.status = make(map[*ssa.BasicBlock]int)
+		this.status[backedge.dst] = 1
+		this.revDfs(backedge.src)
+		for k, v := range this.status {
+			if k != backedge.dst && v == 1 {
+				this.isLoopBB[k] = struct{}{}
+			}
+		}
+	}
+}
 
 func tryBuildOnPackagePath(packagePath string) []*packages.Package {
 	gopath := os.Getenv("GOPATH")
@@ -132,6 +208,35 @@ func Pointer_build_callgraph(prog *ssa.Program) *callgraph.Graph {
 	return graph
 }
 
+func printSSAByBB(bb *ssa.BasicBlock) {
+	for _, ins := range bb.Instrs {
+		fmt.Print("    ")
+		value, ok := ins.(ssa.Value)
+		if ok {
+			fmt.Print(value.Name(), "=")
+		}
+		fmt.Println(ins.String(), reflect.TypeOf(ins))
+	}
+}
+
+func printSSAByFuncName(prog *ssa.Program, name string) {
+	for fn := range ssautil.AllFunctions(prog) {
+		if strings.Contains(fn.Name(), name) {
+			println("found function " + name)
+			lp := NewLoopInfo(fn)
+			lp.Analyze()
+			for _, bb := range fn.Blocks {
+				println(bb.Index)
+				printSSAByBB(bb)
+				for _, bbsucc := range bb.Succs {
+					print(bbsucc.Index, " ")
+				}
+				println()
+			}
+		}
+	}
+}
+
 func main() {
 	packagePath := flag.String("package", "", "The compilable package containing the buggy file.")
 	pathToFile := flag.String("path", "", "The path to the buggy file.")
@@ -155,6 +260,8 @@ func main() {
 	}
 
 	prog, ssapkgs := ssautil.AllPackages(pkgs, ssa.NaiveForm)
+	prog.Build()
+	printSSAByFuncName(prog, "foo")
 	graph := Pointer_build_callgraph(prog)
 	_ = ssapkgs
 	//graph := makeCallGraph(ssapkgs)
@@ -163,7 +270,6 @@ func main() {
 	printCallGraphNodes(graph)
 	// Create SSA packages for well-typed packages and their dependencies.
 	// Build SSA code for the whole program.
-	prog.Build()
 	lineno := getFuncByLineNo(prog, filename, *makeLineNo)
 	_ = lineno
 

@@ -83,7 +83,12 @@ func makeSelect(doneChannelName string, buggyStmt ast.Stmt) *ast.SelectStmt {
 					Case:  0,
 					Comm:  buggyStmt,
 					Colon: 0,
-					Body:  nil,
+					Body: []ast.Stmt{
+						&ast.ReturnStmt{
+							Return:  0,
+							Results: nil,
+						},
+					},
 				},
 			},
 			Rbrace: 0,
