@@ -10,7 +10,11 @@ func main_select_ast() {
 	var src = `package main
 
 func TestGL2Ex3() {
-	done := make(chan struct{})
+	var (
+		done = make(chan struct{})
+		stop = make(chan struct{})
+	)
+	
 	defer close(done)
 	go func() {
 		time.Sleep(5*time.Second)

@@ -12,6 +12,36 @@ import (
 	"strings"
 )
 
+func getLineNoOfMakeChan(lineNoToStmt int, fset *token.FileSet, f *ast.File) int {
+	ret := 0
+	isInVarDecl := false
+	ast.Inspect(f, func(node ast.Node) bool {
+		switch x := node.(type) {
+		case *ast.DeclStmt:
+			decl, ok := x.Decl.(*ast.GenDecl)
+			if ok {
+				if fset.Position(decl.Lparen).Line <= lineNoToStmt && lineNoToStmt <= fset.Position(decl.Rparen).Line {
+					isInVarDecl = true
+					ret = fset.Position(decl.Rparen).Line + 1
+					return false
+				}
+			}
+		case ast.Stmt:
+			if fset.Position(x.Pos()).Line == lineNoToStmt {
+				if !isInVarDecl {
+					ret = lineNoToStmt
+				}
+				return false
+			}
+		}
+		return true
+	})
+	if ret == 0 {
+		panic("didn't find a statement at line number " + strconv.Itoa(lineNoToStmt))
+	}
+	return ret
+}
+
 func makeMakeChanAndDefer(name string) (*ast.AssignStmt, *ast.DeferStmt) {
 	assign := &ast.AssignStmt{
 		Lhs: []ast.Expr{
@@ -116,47 +146,53 @@ func getStmtToInsert(lineNoToStmt int, fset *token.FileSet, f *ast.File) ast.Stm
 }
 
 func insertBeforeLineNo(lineno int, stmts []ast.Stmt, fset *token.FileSet, f *ast.File) {
-	visited := false
+	minLineNo := 99999999
+	var outerBody *ast.BlockStmt
+	index := 0
 	ast.Inspect(f, func(node ast.Node) bool {
 		var body *ast.BlockStmt = nil
 		switch x := node.(type) {
-		case *ast.FuncDecl: //the explicit declaration
-			body = x.Body
-		case *ast.FuncLit:
-			body = x.Body
+		case *ast.BlockStmt:
+			body = x
+			/*		case *ast.FuncDecl: //the explicit declaration
+						body = x.Body
+					case *ast.FuncLit:
+						body = x.Body*/
 		}
 		if body == nil {
 			return true
 		}
 		if fset.Position(body.Lbrace).Line <= lineno && lineno <= fset.Position(body.Rbrace).Line {
-			index := 0
 			for i, stmt := range body.List {
-				if fset.Position(stmt.Pos()).Line == lineno {
-					index = i
-					visited = true
-					break
+				println(fset.Position(stmt.Pos()).Line)
+				currentLineNo := fset.Position(stmt.Pos()).Line
+				if currentLineNo >= lineno {
+					if currentLineNo < minLineNo {
+						minLineNo = currentLineNo
+						index = i
+						outerBody = body
+					}
 				}
 			}
-			if visited {
-				l := len(stmts)
-				newList := make([]ast.Stmt, len(body.List)+l)
-				for i := 0; i < index; i++ {
-					newList[i] = body.List[i]
-				}
-				//newList[index] = stmts[]
-				for i := 0; i < l; i++ {
-					newList[index+i] = stmts[i]
-				}
-				for i := index; i < len(body.List); i++ {
-					newList[i+l] = body.List[i]
-				}
-				body.List = newList
-			}
-			return false
+			return true
 		}
 		return true
 	})
-	if !visited {
+	if minLineNo != 99999999 {
+		l := len(stmts)
+		newList := make([]ast.Stmt, len(outerBody.List)+l)
+		for i := 0; i < index; i++ {
+			newList[i] = outerBody.List[i]
+		}
+		//newList[index] = stmts[]
+		for i := 0; i < l; i++ {
+			newList[index+i] = stmts[i]
+		}
+		for i := index; i < len(outerBody.List); i++ {
+			newList[i+l] = outerBody.List[i]
+		}
+		outerBody.List = newList
+	} else {
 		panic("didn't find a statement at line number " + strconv.Itoa(lineno))
 	}
 }
@@ -166,10 +202,12 @@ func replaceAtLineNo(lineno int, stmtToReplace ast.Stmt, fset *token.FileSet, f 
 	ast.Inspect(f, func(node ast.Node) bool {
 		var body *ast.BlockStmt = nil
 		switch x := node.(type) {
-		case *ast.FuncDecl: //the explicit declaration
-			body = x.Body
-		case *ast.FuncLit:
-			body = x.Body
+		case *ast.BlockStmt:
+			body = x
+			/*case *ast.FuncDecl: //the explicit declaration
+				body = x.Body
+			case *ast.FuncLit:
+				body = x.Body*/
 		}
 		if body == nil {
 			return true
@@ -192,10 +230,10 @@ func replaceAtLineNo(lineno int, stmtToReplace ast.Stmt, fset *token.FileSet, f 
 
 func patch(makeDeferLineNo int, linesToDelete []int, fset *token.FileSet, f *ast.File) {
 	doneChannelName := "__auto_patched_stop"
-	stmt := getStmtToInsert(linesToDelete[0], fset, f)
-	selectStmt := makeSelect(doneChannelName, stmt)
 	makechanOp, deferOp := makeMakeChanAndDefer(doneChannelName)
 	for _, x := range linesToDelete {
+		stmt := getStmtToInsert(x, fset, f)
+		selectStmt := makeSelect(doneChannelName, stmt)
 		replaceAtLineNo(x, selectStmt, fset, f)
 	}
 	insertBeforeLineNo(makeDeferLineNo, []ast.Stmt{makechanOp, deferOp}, fset, f)
@@ -227,6 +265,7 @@ func main() {
 	fmt.Println(dir)
 	filename := os.Args[1]                             //filename
 	lineNoToInsertDefer, _ := strconv.Atoi(os.Args[2]) //the line number to insert the defer operation
+
 	//We insert the code before the line number. i.e., if lineNoToInsertDefer = 123, after insertion,
 	//at line 123 is a defer operation.
 	var linesToDelete []int
@@ -243,6 +282,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	lineNoToInsertDefer = getLineNoOfMakeChan(lineNoToInsertDefer, fset, f)
 	patch(lineNoToInsertDefer, linesToDelete, fset, f)
 
 	var retbuf strings.Builder
